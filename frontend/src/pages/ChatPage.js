@@ -12,6 +12,10 @@ const QUICK_PROMPTS = [
   "How does your memory work?",
 ];
 
+/**
+ * Chat — same surface as the workspace: a fixed left rail, a centred column for
+ * the conversation, and the composer pinned at the bottom.
+ */
 export default function ChatPage() {
   const { token } = useAuth();
   const { state, setChatMessages, setChatInput } = useAppState();
@@ -68,90 +72,133 @@ export default function ChatPage() {
   };
 
   const hasChat = messages.length > 0;
-  const modelBadge = process.env.REACT_APP_MODEL_BADGE || "Gemini + mem0";
 
   return (
-    <div className="zen-chat-app">
+    <div className="k-chat k-surface">
       <MemoryBankSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <header className="zen-topbar">
-        <div className="zen-topbar-left">
-          <button type="button" className="zen-icon-btn" onClick={() => setSidebarOpen(true)} aria-label="Menu">
+      <aside className="k-side">
+        <div className="k-side-top">
+          <button
+            type="button"
+            className="k-side-back"
+            onClick={() => setSidebarOpen(true)}
+            title="Memory bank"
+            aria-label="Open memory bank"
+          >
             ☰
           </button>
-          <span className="zen-star-logo">✦</span>
-          <span className="zen-topbar-brand">Zen Agent</span>
+          <span className="k-side-brand">Zen</span>
         </div>
-        <Link to="/graph" className="zen-graph-btn">
-          <span aria-hidden="true">◉</span> Graph
-        </Link>
-        <div className="zen-topbar-right">
-          <span className="zen-model-pill">{modelBadge}</span>
-          <Link to="/workspace" className="zen-workspace-link" title="Debug workspace">
-            Workspace
+
+        <div className="k-side-group">
+          <div className="k-group-label">
+            <span>Workspace</span>
+          </div>
+          <Link to="/graph" className="k-nav">
+            <span className="k-nav-mark">◉</span>
+            <span>Memory graph</span>
+          </Link>
+          <Link to="/workspace" className="k-nav">
+            <span className="k-nav-mark">◫</span>
+            <span>Debug workspace</span>
           </Link>
         </div>
-      </header>
 
-      <main className={`zen-chat-main${hasChat ? " has-messages" : ""}`} ref={listRef}>
-        {!hasChat && (
-          <div className="zen-hero">
-            <div className="zen-hero-brain">🧠</div>
-            <h1>Hello, I&apos;m Zen</h1>
-            <p>A self-learning AI agent. I remember our conversations and get better over time.</p>
-            <div className="zen-quick-prompts">
-              {QUICK_PROMPTS.map((q) => (
-                <button key={q} type="button" onClick={() => send(q)}>
-                  {q}
-                </button>
-              ))}
-            </div>
+        <div className="k-side-group k-side-files">
+          <div className="k-group-label">
+            <span>Chats</span>
           </div>
-        )}
+          <p className="k-side-note">Your current conversation.</p>
+        </div>
+      </aside>
 
-        {hasChat && (
-          <div className="zen-message-list">
-            {messages.map((m, i) => (
-              <div key={i} className={`zen-message ${m.role}`}>
-                {m.role === "assistant" ? (
-                  <ReactMarkdown>{m.content}</ReactMarkdown>
-                ) : (
-                  <p>{m.content}</p>
-                )}
+      <div className="k-chat-main">
+        <div className="k-chat-scroll" ref={listRef}>
+          <div className="k-chat-inner">
+            {!hasChat && (
+              <div className="k-hero">
+                <h1 className="k-hero-title">What can I help you with?</h1>
+                <p className="k-hero-sub">
+                  A self-learning assistant. I remember what matters across conversations.
+                </p>
               </div>
-            ))}
-            {loading && (
-              <div className="zen-message assistant zen-typing">
-                <span />
-                <span />
-                <span />
+            )}
+
+            {hasChat && (
+              <div className="k-msg-list">
+                {messages.map((m, i) => (
+                  <div key={i} className={`k-msg-row k-msg-row--${m.role}`}>
+                    {m.role === "assistant" && (
+                      <span className="k-avatar" aria-hidden="true">
+                        Z
+                      </span>
+                    )}
+                    <article className={`k-msg k-msg--${m.role}`}>
+                      <div className="k-msg-body">
+                        {m.role === "assistant" ? (
+                          <ReactMarkdown>{m.content}</ReactMarkdown>
+                        ) : (
+                          <p>{m.content}</p>
+                        )}
+                      </div>
+                    </article>
+                  </div>
+                ))}
+                {loading && (
+                  <div className="k-msg-row k-msg-row--assistant">
+                    <span className="k-avatar" aria-hidden="true">
+                      Z
+                    </span>
+                    <article className="k-msg k-msg--assistant">
+                      <div className="k-typing">
+                        <span />
+                        <span />
+                        <span />
+                      </div>
+                    </article>
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
-      </main>
+        </div>
 
-      <footer className="zen-composer-wrap">
-        <form
-          className="zen-composer"
-          onSubmit={(e) => {
-            e.preventDefault();
-            send(input);
-          }}
-        >
-          <input
-            type="text"
-            placeholder="Message Zen…"
-            value={input}
-            onChange={(e) => setChatInput(e.target.value)}
-            disabled={loading}
-          />
-          <button type="submit" disabled={loading || !input.trim()} aria-label="Send">
-            ➤
-          </button>
-        </form>
-        <p className="zen-composer-note">Zen learns from every conversation via mem0 memory</p>
-      </footer>
+        <div className="k-composer-wrap">
+          <div className="k-composer-inner">
+            <form
+              className="k-composer"
+              onSubmit={(e) => {
+                e.preventDefault();
+                send(input);
+              }}
+            >
+              <input
+                type="text"
+                placeholder="Message Zen…"
+                value={input}
+                onChange={(e) => setChatInput(e.target.value)}
+                disabled={loading}
+              />
+              <button type="submit" disabled={loading || !input.trim()} aria-label="Send">
+                ↑
+              </button>
+            </form>
+
+            {!hasChat && (
+              <div className="k-quick">
+                {QUICK_PROMPTS.map((q) => (
+                  <button key={q} type="button" onClick={() => send(q)}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <p className="k-composer-note">Zen learns from every conversation via mem0 memory</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

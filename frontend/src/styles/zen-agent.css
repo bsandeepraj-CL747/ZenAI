@@ -244,9 +244,15 @@
 
 /* ─── Chat shell ───────────────────────────────────────────────────────── */
 
+/* `height` (not `min-height`) is essential. index.css sets
+   `body, html, #root { height: 100vh; overflow: hidden }`, so if this column is
+   allowed to grow past the viewport the inner pane never becomes scrollable —
+   the content just grows and gets clipped, which is what made the chat
+   unscrollable. Bounding the column makes .zen-chat-main the scroll container. */
 .zen-chat-app,
 .zen-graph-app {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--zen-bg);
   color: var(--zen-text);
   display: flex;
@@ -333,6 +339,7 @@
 
 .zen-chat-main {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -409,6 +416,11 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 0;
+  /* Long unbroken tokens (URLs, stack traces) must not widen the column and
+     push the page past the viewport. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .zen-message {
@@ -544,6 +556,7 @@
   left: 0;
   width: min(320px, 88vw);
   height: 100vh;
+  min-height: 0;
   background: #121212;
   border-right: 1px solid var(--zen-border);
   z-index: 50;

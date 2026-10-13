@@ -1,97 +1,70 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { useAgent } from "../hooks/useAgent";
-import { FileExplorer } from "../components/FileExplorer";
+import { ProjectSidebar } from "../components/ProjectSidebar";
 import { FileViewer } from "../components/FileViewer";
-import { TerminalPanel } from "../components/TerminalPanel";
-import { AgentPanel } from "../components/AgentPanel";
-import { Link } from "react-router-dom";
+import { AgentFlow } from "../components/AgentFlow";
 
+/**
+ * Workspace layout: files on the left, the code in the middle, and the agent's
+ * progress + conclusions on the right.
+ */
 export default function WorkspacePage() {
+  const navigate = useNavigate();
+
   const {
     codebase,
     refreshCodebase,
     agentState,
     agentStatus,
     activeSession,
-    logs,
+    attempts,
     activeFile,
     fileContent,
-    setFileContent,
-    fileSaving,
-    lastDiff,
     memory,
-    strategy,
-    memorySaved,
     explanation,
+    fixSummary,
     openFile,
-    saveActiveFile,
-    startDebugSession,
-    executeTerminalCmd,
   } = useAgent(".");
 
+  // Closing the preview clears the selection so the pane shows its empty state
+  // rather than a stale file.
+  const handleClosePreview = () => {
+    openFile(null);
+  };
+
   return (
-    <div className="app-container">
-      <header className="app-header">
-        <div className="header-brand">
-          <Link to="/" className="zen-link-back">
-            ← Chat
-          </Link>
-          <span className="brand-logo">🧘</span>
-          <h1>Zen</h1>
-          <span className="brand-badge">Autonomous Debugging Agent</span>
-        </div>
+    <div className="k-app k-surface">
+      <ProjectSidebar
+        codebase={codebase}
+        activeFile={activeFile}
+        onSelectFile={openFile}
+        onRefresh={refreshCodebase}
+        onBackToChat={() => navigate("/")}
+      />
 
-        {codebase && (
-          <div className="header-project-info">
-            <span className="info-chip">📂 {codebase.project_name}</span>
-            <span className="info-chip">⚡ {codebase.primary_language}</span>
-            {codebase.frameworks && codebase.frameworks.length > 0 && (
-              <span className="info-chip">🛠️ {codebase.frameworks.join(", ")}</span>
-            )}
-          </div>
-        )}
-      </header>
-
-      <main className="workspace">
-        <aside className="workspace-left">
-          <FileExplorer
-            codebase={codebase}
+      <div className="k-content">
+        {/* middle: the code itself */}
+        <section className="k-viewer-pane">
+          <FileViewer
             activeFile={activeFile}
-            onSelectFile={openFile}
-            onRefresh={refreshCodebase}
+            content={fileContent}
+            onClose={handleClosePreview}
           />
-        </aside>
-
-        <section className="workspace-center">
-          <div className="editor-section">
-            <FileViewer
-              activeFile={activeFile}
-              content={fileContent}
-              onChange={(val) => setFileContent(val)}
-              onSave={saveActiveFile}
-              isSaving={fileSaving}
-            />
-          </div>
-
-          <div className="terminal-section">
-            <TerminalPanel logs={logs} onRunCommand={executeTerminalCmd} />
-          </div>
         </section>
 
-        <aside className="workspace-right">
-          <AgentPanel
-            agentState={agentState}
-            agentStatus={agentStatus}
-            activeSession={activeSession}
-            onStartSession={startDebugSession}
-            lastDiff={lastDiff}
-            memory={memory}
-            strategy={strategy}
-            memorySaved={memorySaved}
-            explanation={explanation}
-          />
-        </aside>
-      </main>
+        {/* right: what the agent is doing and concluded */}
+        <AgentFlow
+          agentState={agentState}
+          agentStatus={agentStatus}
+          activeSession={activeSession}
+          attempts={attempts}
+          codebase={codebase}
+          memory={memory}
+          explanation={explanation}
+          fixSummary={fixSummary}
+        />
+      </div>
     </div>
   );
 }

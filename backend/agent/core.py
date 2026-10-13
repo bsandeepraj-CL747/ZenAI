@@ -7,15 +7,18 @@ Uses Groq LLM tool calling to inspect code, apply patches, run commands, and ver
 Memory-aware: reads from and writes to the project's .zen/ directory
 to remember past fixes and skip redundant analysis.
 """
+import asyncio
 import json
 import logging
 import subprocess
 import time
+from pathlib import Path
 from typing import Dict, Any, Optional, List
 
 from codebase.scanner import scan_project, update_codebase_model
 from codebase.search import correlation_search, search_code, find_symbol
 from terminal.executor import execute_command
+from terminal.model import extract_failing_location
 from tools.filesystem import list_files, read_file, write_file
 from tools.patch import apply_patch
 from tools.git import create_checkpoint, rollback_checkpoint, get_git_diff
@@ -137,6 +140,61 @@ def generate_plain_english_explanation(error_type: str, error_message: str, diag
     }
 
 
+def _is_tool_generation_failure(err_text: str) -> bool:
+    """True when Groq rejected the model's own tool-call output.
+
+    These are `tool_use_failed` 400s ("Failed to parse tool call arguments as
+    JSON" / "Parsing failed. The model generated ..."). The model emitted
+    malformed JSON, so nothing was executed — retrying usually resamples into a
+    valid call, unlike a genuine semantic failure.
+    """
+    t = (err_text or "").lower()
+    return (
+        "tool_use_failed" in t
+        or "failed to parse tool call arguments" in t
+        or "parsing failed" in t
+        or "failed_generation" in t
+    )
+
+
+def _annotate_last_fix(project_path: str, extra: dict) -> None:
+    """Merge readable summary fields into the fix record just appended.
+
+    `.zen/fixes.json` is append-only elsewhere; this only enriches the final
+    entry with the fields the workspace UI displays.
+    """
+    fixes = load_fixes(project_path)
+    if not fixes:
+        return
+    fixes[-1].update({k: v for k, v in extra.items() if v is not None})
+    zen = Path(project_path) / ".zen"
+    zen.mkdir(exist_ok=True)
+    (zen / "fixes.json").write_text(
+        json.dumps(fixes, indent=2, default=str), encoding="utf-8"
+    )
+
+
+async def _chat_with_retry(client, messages, tools=None, attempts: int = 3):
+    """Call the LLM, retrying malformed-tool-call failures.
+
+    Without this, one bad sample aborts the attempt, gets classified as
+    LLM error, and the cycle detector escalates the whole session.
+    """
+    response = await chat_completion(client, messages, tools=tools or DEBUGGER_TOOLS)
+    tries = 1
+    while (
+        response.get("error")
+        and _is_tool_generation_failure(str(response["error"]))
+        and tries < attempts
+    ):
+        await asyncio.sleep(0.5 * tries)
+        tries += 1
+        response = await chat_completion(client, messages, tools=tools or DEBUGGER_TOOLS)
+    if tries > 1 and not response.get("error"):
+        logger.info("Recovered from tool-generation failure on attempt %d", tries)
+    return response
+
+
 class DebugAgentEngine:
     def __init__(self, session: ActiveSession):
         self.session = session
@@ -220,6 +278,11 @@ class DebugAgentEngine:
             error_msg = exec_summary.get("last_error_message") or last_result.stderr[:200]
 
             # Check for repeating cycles
+            # Fingerprint of the error BEFORE this attempt patches anything,
+            # used after verification to tell "still stuck" from "made progress".
+            error_signature_before = session.safety.compute_error_signature(
+                error_type, error_msg, last_result.stderr
+            )
             is_cycle, cycle_msg = session.safety.check_cycle(error_type, error_msg, last_result.stderr)
             if is_cycle:
                 session.status = "escalated"
@@ -262,11 +325,20 @@ class DebugAgentEngine:
             # Correlate error to files
             correlated_files = correlation_search(session.project_path, last_result.stderr, session.codebase)
 
+            # The traceback names the file that actually failed. State it
+            # explicitly: without this the agent can patch an unrelated file
+            # forever while a SyntaxError blocks the script from ever running.
+            failing = extract_failing_location(
+                last_result.stderr or last_result.stdout, session.project_path
+            )
+
             # Build context payload
             context_data = build_agent_context(
                 session.codebase, session.execution, session.attempts, "diagnose"
             )
             context_data["correlated_files"] = correlated_files
+            if failing:
+                context_data["failing_location"] = failing
 
             # Inject memory context if available
             if similar_fix:
@@ -281,6 +353,10 @@ class DebugAgentEngine:
                 "state": "diagnose",
                 "attempt": attempt_num,
                 "correlated_files": [f["path"] for f in correlated_files],
+                "failing_file": failing["file"] if failing else None,
+                "failing_line": failing["line"] if failing else None,
+                "error_type": error_type,
+                "error_message": (error_msg or "")[:300],
             })
 
             # Build prompt with optional memory context
@@ -288,11 +364,20 @@ class DebugAgentEngine:
             if similar_fix:
                 memory_hint_text = f"\n\n**Memory Hint**: A similar error was fixed before. Previous diagnosis: '{similar_fix.get('diagnosis', '')}'. Files modified: {similar_fix.get('files_modified', [])}. Consider a similar approach, but verify the current state first."
 
+            location_text = ""
+            if failing:
+                location_text = (
+                    f"\n\n**The traceback points at `{failing['file']}` line "
+                    f"{failing['line']}.** Fix the error in THAT file first. A "
+                    f"syntax error there stops the whole program before any other "
+                    f"file runs, so patches elsewhere cannot be verified."
+                )
+
             messages = [
                 {"role": "system", "content": SYSTEM_PROMPT_AGENT},
                 {
                     "role": "user",
-                    "content": f"Context:\n```json\n{json.dumps(context_data, indent=2)}\n```\nAnalyze the error, inspect relevant files using read_file or search_code if needed, and apply a targeted patch using apply_patch.{memory_hint_text}",
+                    "content": f"Context:\n```json\n{json.dumps(context_data, indent=2)}\n```\nAnalyze the error, inspect relevant files using read_file or search_code if needed, and apply a targeted patch using apply_patch.{location_text}{memory_hint_text}",
                 },
             ]
 
@@ -306,21 +391,61 @@ class DebugAgentEngine:
             patch_diff_text = ""
             diagnosis_text = ""
             plan_text = ""
+            llm_failures = 0
+            last_search = None
+            last_replace = None
 
             # Multi-turn tool loop (read → patch). Duplicate assistant
             # messages break Groq tool-calling, so append exactly once.
             for turn in range(8):
-                response = await chat_completion(client, messages, tools=DEBUGGER_TOOLS)
+                response = await _chat_with_retry(client, messages)
                 assistant_msg = response["message"]
 
                 if response.get("error"):
-                    await session.broadcast("llm_error", {"error": response["error"]})
-                    diagnosis_text = diagnosis_text or f"LLM error: {response['error']}"
+                    err_text = str(response["error"])
+                    llm_failures += 1
+                    await session.broadcast("llm_error", {"error": err_text})
+                    diagnosis_text = diagnosis_text or f"LLM error: {err_text}"
+
+                    if _is_tool_generation_failure(err_text):
+                        # The model emitted malformed tool-call JSON. This is a
+                        # sampling failure, not a code problem — retrying in
+                        # _chat_with_retry often succeeds. If it keeps failing,
+                        # stop burning turns and say so plainly.
+                        if llm_failures >= 2:
+                            diagnosis_text = (
+                                "The model repeatedly produced a malformed tool call "
+                                "(Groq tool_use_failed). This usually happens when it "
+                                "tries to write a very large file in one call. "
+                                "No code was changed."
+                            )
+                            await session.broadcast("strategy", {
+                                "type": "llm_failure",
+                                "message": diagnosis_text,
+                            })
+                            break
+                        # Nudge it toward a smaller, surgical edit and try again.
+                        messages.append({
+                            "role": "user",
+                            "content": (
+                                "Your previous tool call could not be parsed. Do not "
+                                "rewrite whole files or emit large content blocks. "
+                                "Use apply_patch with a SHORT `search` and `replace` "
+                                "that changes only the buggy lines."
+                            ),
+                        })
+                        continue
                     break
 
-                # Capture diagnosis/plan from LLM response
+                llm_failures = 0
+
+                # Capture diagnosis/plan from the model. gpt-oss returns empty
+                # `content` alongside tool calls and puts its reasoning in a
+                # separate field, so fall back to that instead of recording "".
                 if assistant_msg.get("content"):
-                    diagnosis_text = assistant_msg.get("content")
+                    diagnosis_text = assistant_msg["content"]
+                elif assistant_msg.get("reasoning") and not diagnosis_text:
+                    diagnosis_text = assistant_msg["reasoning"]
 
                 tool_calls = assistant_msg.get("tool_calls", []) or []
 
@@ -391,6 +516,11 @@ class DebugAgentEngine:
                             rel_path = args.get("file_path") or args.get("path")
                             if rel_path and rel_path not in modified_files:
                                 modified_files.append(rel_path)
+                            # Remember the winning edit so the UI can show the
+                            # exact before/after that fixed it.
+                            if args.get("search"):
+                                last_search = args.get("search")
+                                last_replace = args.get("replace")
                             await session.broadcast("patch_applied", {
                                 "file": rel_path,
                                 "search": args.get("search"),
@@ -472,6 +602,25 @@ class DebugAgentEngine:
             }
             save_fix(session.project_path, fix_record)
 
+            # Keep the readable summary in project memory too, so the workspace
+            # can show a real root cause on later visits (not just live).
+            try:
+                _annotate_last_fix(session.project_path, {
+                    "error_type": error_type,
+                    "failing_file": failing["file"] if failing else None,
+                    "failing_line": failing["line"] if failing else None,
+                    "diagnosis": (diagnosis_text or "")[:600],
+                    "why_failed": explanation["why_failed"],
+                    "what_fixed": explanation["what_fixed"],
+                    "search": last_search,
+                    "replace": last_replace,
+                })
+            except Exception as exc:
+                # Warning, not debug: silently swallowing this is what hid a
+                # missing import and left the UI without a root cause.
+                logger.warning("Could not annotate fix record: %s: %s",
+                               type(exc).__name__, exc)
+
             if verify_res.exit_code == 0:
                 # Save a context note about what we learned
                 add_context_note(
@@ -504,20 +653,43 @@ class DebugAgentEngine:
                     "what_fixed": explanation["what_fixed"],
                     "files_modified": modified_files,
                     "verified_output": verify_res.stdout.strip() if verify_res.stdout else "Exit code 0 (Clean run)",
+                    "error_type": error_type,
+                    "error_message": error_msg,
+                    "failing_file": failing["file"] if failing else None,
+                    "failing_line": failing["line"] if failing else None,
+                    "diagnosis": (diagnosis_text or "")[:600],
+                    "command": session.initial_command,
+                    "patch": {
+                        "file": modified_files[0] if modified_files else None,
+                        "search": last_search,
+                        "replace": last_replace,
+                    },
                 })
                 break
             else:
-                # The patch did not fix it. Undo this attempt's changes so the
-                # next attempt starts from the last known state instead of
-                # building on a broken one.
-                restored = checkpoint.restore()
-                if restored:
-                    await session.broadcast("patch_rolled_back", {
+                # Only undo this attempt's changes if it made NO progress.
+                # Reverting a patch that fixed one of several bugs just forces
+                # the next attempt to redo it — and guarantees the identical
+                # stderr, which trips the cycle detector into escalating.
+                new_sig = session.safety.compute_error_signature(
+                    error_type, error_msg, verify_res.stderr
+                )
+                if new_sig != error_signature_before:
+                    await session.broadcast("patch_kept", {
                         "attempt": attempt_num,
-                        "files": restored,
-                        "reason": "verification failed",
+                        "files": checkpoint.touched,
+                        "reason": "error changed — keeping partial progress",
                     })
-                    update_codebase_model(session.project_path, session.codebase, restored)
+                    restored = []
+                else:
+                    restored = checkpoint.restore()
+                    if restored:
+                        await session.broadcast("patch_rolled_back", {
+                            "attempt": attempt_num,
+                            "files": restored,
+                            "reason": "verification failed with the same error",
+                        })
+                        update_codebase_model(session.project_path, session.codebase, restored)
 
                 await session.broadcast("verification_failed", {
                     "attempt": attempt_num,

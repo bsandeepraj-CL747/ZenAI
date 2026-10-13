@@ -1,58 +1,66 @@
 import React from "react";
 import Editor from "@monaco-editor/react";
 
-export function FileViewer({ activeFile, content, onChange, onSave, isSaving }) {
+/**
+ * Read-only file preview. The agent is what edits files; this is for
+ * inspecting them, so there is no save action.
+ */
+export function FileViewer({ activeFile, content, onClose, theme = "light" }) {
   if (!activeFile) {
     return (
-      <div className="file-viewer-empty">
-        <div className="empty-state-content">
-          <span className="empty-icon">💻</span>
-          <h3>No File Selected</h3>
-          <p>Select a file from the explorer on the left to view or edit code.</p>
-        </div>
+      <div className="k-viewer-empty">
+        <p>Select a file to preview it.</p>
       </div>
     );
   }
 
-  const getLanguage = (path) => {
-    if (path.endsWith(".py")) return "python";
-    if (path.endsWith(".js") || path.endsWith(".jsx")) return "javascript";
-    if (path.endsWith(".ts") || path.endsWith(".tsx")) return "typescript";
-    if (path.endsWith(".json")) return "json";
-    if (path.endsWith(".html")) return "html";
-    if (path.endsWith(".css")) return "css";
+  const language = (() => {
+    const p = activeFile.toLowerCase();
+    if (p.endsWith(".py")) return "python";
+    if (p.endsWith(".js") || p.endsWith(".jsx")) return "javascript";
+    if (p.endsWith(".ts") || p.endsWith(".tsx")) return "typescript";
+    if (p.endsWith(".json")) return "json";
+    if (p.endsWith(".html")) return "html";
+    if (p.endsWith(".css")) return "css";
+    if (p.endsWith(".md")) return "markdown";
     return "plaintext";
-  };
+  })();
 
   return (
-    <div className="file-viewer">
-      <div className="viewer-header">
-        <div className="viewer-title">
-          <span className="file-path">{activeFile}</span>
-        </div>
-        <button
-          className="btn btn-save"
-          onClick={() => onSave(content)}
-          disabled={isSaving}
-        >
-          {isSaving ? "Saving..." : "💾 Save File"}
-        </button>
+    <div className="k-viewer">
+      <div className="k-viewer-head">
+        <span className="k-viewer-path" title={activeFile}>
+          {activeFile}
+        </span>
+        <span className="k-viewer-actions">
+          <span className="k-viewer-tag">read-only</span>
+          <button
+            type="button"
+            className="k-viewer-close"
+            onClick={onClose}
+            title="Close preview"
+            aria-label="Close preview"
+          >
+            ✕
+          </button>
+        </span>
       </div>
-
-      <div className="editor-container">
+      <div className="k-viewer-body">
         <Editor
           height="100%"
-          language={getLanguage(activeFile)}
+          language={language}
           value={content}
-          theme="vs-dark"
-          onChange={(val) => onChange(val || "")}
+          theme={theme === "dark" ? "vs-dark" : "light"}
           options={{
-            fontSize: 14,
+            readOnly: true,
+            fontSize: 13,
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
             automaticLayout: true,
             lineNumbers: "on",
             wordWrap: "on",
+            renderLineHighlight: "none",
+            domReadOnly: true,
           }}
         />
       </div>

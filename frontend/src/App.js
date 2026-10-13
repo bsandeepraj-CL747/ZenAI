@@ -10,6 +10,7 @@ import MemoryGraphPage from "./pages/MemoryGraphPage";
 import WorkspacePage from "./pages/WorkspacePage";
 import "./index.css";
 import "./styles/zen-agent.css";
+import "./styles/kimi-workspace.css";
 
 function HomeOrWorkspace() {
   const [params] = useSearchParams();

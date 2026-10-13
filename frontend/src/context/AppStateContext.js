@@ -64,6 +64,8 @@ const defaultState = {
     strategy: null,
     memorySaved: null,
     explanation: null,
+    // Root-cause / code-fix summary for the finished session.
+    fixSummary: null,
   },
 };
 

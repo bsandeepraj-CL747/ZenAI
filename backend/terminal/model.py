@@ -7,9 +7,44 @@ Maintains a live representation of the terminal state including:
 - Exit codes and durations
 - Recent failure tracking
 """
+import os
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, List
+
+
+# "SyntaxError: invalid syntax" / "ModuleNotFoundError: No module named 'sub.py'"
+_EXC_LINE = re.compile(
+    r"^([A-Za-z_][A-Za-z0-9_.]*(?:Error|Exception|Exit|Interrupt|Warning))\b\s*:?\s*(.*)$"
+)
+# Python traceback frame: File "C:\path\to\file.py", line 12
+_TRACEBACK_FRAME = re.compile(r'File "([^"]+)",\s*line\s*(\d+)')
+
+
+def extract_failing_location(text: str, project_root: str = "") -> Optional[dict]:
+    """Find the innermost traceback frame: {"file", "line"}.
+
+    Python names the file that actually failed in its traceback. Surfacing that
+    explicitly stops the agent guessing which file to patch — the failure mode
+    where it repeatedly fixes an unrelated file while the real SyntaxError
+    blocks the script before it ever runs.
+    """
+    if not text:
+        return None
+    frames = _TRACEBACK_FRAME.findall(text)
+    if not frames:
+        return None
+    path, line = frames[-1]
+    rel = path
+    if project_root:
+        try:
+            rel = os.path.relpath(path, project_root)
+        except Exception:
+            rel = path
+    if rel.startswith(".."):
+        rel = path
+    return {"file": rel.replace("\\", "/"), "line": int(line), "abs_path": path}
 
 
 @dataclass
@@ -29,6 +64,26 @@ class CommandResult:
     @property
     def success(self) -> bool:
         return self.exit_code == 0
+
+    @property
+    def error_type(self) -> Optional[str]:
+        """The real exception class from stderr, e.g. 'SyntaxError'.
+
+        Previously every failure was reported as 'RuntimeError', which made the
+        error fingerprint (and therefore memory matching and cycle detection)
+        treat unrelated bugs as the same error.
+        """
+        text = self.stderr.strip() or self.stdout.strip()
+        if not text:
+            return None
+        for raw in reversed(text.splitlines()):
+            line = raw.strip()
+            if not line:
+                continue
+            m = _EXC_LINE.match(line)
+            if m:
+                return m.group(1).split(".")[-1]
+        return None
 
     @property
     def error_summary(self) -> str:
@@ -106,7 +161,7 @@ class ExecutionModel:
     def to_summary(self) -> dict:
         last_err = self.get_last_error()
         return {
-            "last_error_type": "RuntimeError" if last_err else None,
+            "last_error_type": (last_err.error_type if last_err else None),
             "last_error_message": last_err.error_summary if last_err else None,
         }
 

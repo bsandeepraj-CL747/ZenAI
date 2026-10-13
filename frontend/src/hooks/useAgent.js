@@ -32,6 +32,7 @@ export function useAgent(initialProjectPath = ".") {
   const strategy = workspaceState.strategy || null;
   const memorySaved = workspaceState.memorySaved || null;
   const explanation = workspaceState.explanation || null;
+  const fixSummary = workspaceState.fixSummary || null;
 
   // Memoize setters to avoid re-renders
   const setProjectPath = useCallback(
@@ -115,6 +116,11 @@ export function useAgent(initialProjectPath = ".") {
     [updateWorkspace]
   );
 
+  const setFixSummary = useCallback(
+    (val) => updateWorkspace({ fixSummary: val }),
+    [updateWorkspace]
+  );
+
   // Load codebase model
   const refreshCodebase = useCallback(
     async (path = projectPath) => {
@@ -158,11 +164,15 @@ export function useAgent(initialProjectPath = ".") {
     loadMemory();
   }, [projectPath, setMemory, setExplanation]);
 
-  // Open file in viewer
+  // Open file in viewer. Passing a falsy path just clears the selection.
   const openFile = useCallback(
     async (filePath) => {
+      setActiveFile(filePath || null);
+      if (!filePath) {
+        setFileContent("");
+        return;
+      }
       try {
-        setActiveFile(filePath);
         const res = await api.readFile(filePath, projectPath);
         setFileContent(res.content);
       } catch (err) {
@@ -275,6 +285,12 @@ export function useAgent(initialProjectPath = ".") {
           } else if (msg.event === "completed") {
             setLogs((prev) => [...prev, `✅ SUCCESS: ${msg.data.message}`]);
             if (msg.data.patch_diff) setLastDiff(msg.data.patch_diff);
+            // Keep the whole payload so the workspace can show the real root
+            // cause, the exact edit, and the verified command output.
+            setFixSummary({
+              ...msg.data,
+              finishedAt: new Date().toISOString(),
+            });
             if (msg.data.why_failed || msg.data.what_fixed) {
               setExplanation({
                 why_failed: msg.data.why_failed,
@@ -328,6 +344,7 @@ export function useAgent(initialProjectPath = ".") {
       setStrategy,
       setMemorySaved,
       setExplanation,
+      setFixSummary,
       setLastDiff,
     ]
   );
@@ -480,6 +497,7 @@ export function useAgent(initialProjectPath = ".") {
         setStrategy(null);
         setMemorySaved(null);
         setExplanation(null);
+        setFixSummary(null);
         setLogs((prev) => [
           ...prev,
           `🚀 Starting debug session for command: '${command}'...`,
@@ -507,6 +525,7 @@ export function useAgent(initialProjectPath = ".") {
       setStrategy,
       setMemorySaved,
       setExplanation,
+      setFixSummary,
       setLogs,
       setActiveSession,
       setProjectPath,
@@ -567,6 +586,7 @@ export function useAgent(initialProjectPath = ".") {
     strategy,
     memorySaved,
     explanation,
+    fixSummary,
     openFile,
     saveActiveFile,
     startDebugSession,

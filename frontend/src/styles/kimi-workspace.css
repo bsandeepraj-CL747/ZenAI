@@ -1,0 +1,1452 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   Shared surface design — Kimi-style.
+
+   One token set drives the whole app: the workspace and the chat both apply
+   `.k-surface`, so they stay visually identical and switching the entire app to
+   dark means overriding these variables in one place.
+
+   Bounded height is deliberate: the shell sets `overflow: hidden` on
+   html/body/#root, so each region owns its own scrolling.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.k-surface {
+  /* surface */
+  --k-bg: #ffffff;
+  --k-side: #fbfbfa;
+  --k-border: #ececea;
+  --k-border-strong: #e0e0dd;
+
+  /* type */
+  --k-text: #1a1a1a;
+  --k-text-dim: #6b6b6b;
+  --k-text-faint: #9a9a97;
+
+  /* accents */
+  --k-hover: #f4f4f2;
+  --k-active: #eeeeec;
+  --k-accent: #4a72f5;
+  --k-ok: #1a8f5a;
+  --k-ok-bg: #eef8f2;
+  --k-bad: #c0392b;
+  --k-bad-bg: #fdf1ef;
+  --k-warn: #b7791f;
+
+  --k-mono: "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --k-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  background: var(--k-bg);
+  color: var(--k-text);
+  font-family: var(--k-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── workspace shell ─────────────────────────────────────────────────────── */
+
+.k-app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── left rail ───────────────────────────────────────────────────────────── */
+
+.k-side {
+  flex: 0 0 252px;
+  width: 252px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--k-side);
+  border-right: 1px solid var(--k-border);
+  overflow: hidden;
+}
+
+.k-side-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 16px 10px;
+}
+
+.k-side-back {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border: 1px solid var(--k-border-strong);
+  border-radius: 7px;
+  background: var(--k-bg);
+  color: var(--k-text-dim);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.k-side-back:hover {
+  background: var(--k-hover);
+  color: var(--k-text);
+}
+
+.k-side-brand {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+}
+
+.k-side-group {
+  padding: 8px 12px;
+  min-height: 0;
+}
+
+.k-side-files {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  padding-top: 4px;
+}
+
+.k-group-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--k-text-faint);
+}
+
+.k-group-count {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.k-side-refresh {
+  border: none;
+  background: transparent;
+  color: var(--k-text-faint);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+  border-radius: 4px;
+}
+
+.k-side-refresh:hover {
+  color: var(--k-text);
+  background: var(--k-hover);
+}
+
+/* project identity, mirroring the reference's project rows */
+.k-project {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  background: var(--k-active);
+}
+
+.k-project::before {
+  content: "";
+  flex: 0 0 14px;
+  width: 14px;
+  height: 11px;
+  border: 1.5px solid var(--k-text-dim);
+  border-radius: 3px;
+}
+
+.k-project-name {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.k-project-meta {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--k-text-faint);
+  white-space: nowrap;
+}
+
+.k-side-note {
+  margin: 4px 6px;
+  font-size: 12px;
+  color: var(--k-text-faint);
+}
+
+.k-file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 4px 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.k-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--k-text-dim);
+  font-family: var(--k-sans);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.k-file:hover {
+  background: var(--k-hover);
+  color: var(--k-text);
+}
+
+.k-file.is-active {
+  background: var(--k-active);
+  color: var(--k-text);
+  font-weight: 500;
+}
+
+.k-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--k-mono);
+  font-size: 11.5px;
+}
+
+.k-ficon {
+  flex: 0 0 20px;
+  width: 20px;
+  text-align: center;
+  font-family: var(--k-mono);
+  font-size: 9.5px;
+  color: var(--k-text-faint);
+}
+
+.k-ficon-entry { color: var(--k-ok); }
+.k-ficon-test { color: var(--k-accent); }
+
+/* ── content column ──────────────────────────────────────────────────────── */
+
+.k-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+/* middle: the code, filling all space the rail and sidebar leave */
+.k-viewer-pane {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--k-bg);
+}
+
+/* right: the agent's progress and conclusions, laid out like a sidebar */
+.k-main {
+  flex: 0 0 404px;
+  width: 404px;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--k-border);
+  background: var(--k-side);
+}
+
+.k-main-inner {
+  padding: 26px 22px 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* hero, in the narrow rail it reads left-aligned */
+.k-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px 2px 0;
+}
+
+.k-hero-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.k-hero-sub {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--k-text-dim);
+  line-height: 1.6;
+}
+
+.k-hero-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 12px;
+  flex: 0 0 22px;
+}
+
+.k-hero-mark--ok { background: var(--k-ok-bg); color: var(--k-ok); }
+.k-hero-mark--bad { background: var(--k-bad-bg); color: var(--k-bad); }
+
+.k-hero-mark--busy {
+  border: 2px solid var(--k-border-strong);
+  border-top-color: var(--k-accent);
+  animation: k-spin 0.8s linear infinite;
+}
+
+@keyframes k-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Vertical stepper: the agent rail is narrow, so the six phases stack with a
+   connector line rather than sitting side by side. */
+.k-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.k-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--k-text-faint);
+  padding: 5px 0;
+  position: relative;
+}
+
+.k-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 21px;
+  bottom: -3px;
+  width: 1px;
+  height: auto;
+  background: var(--k-border-strong);
+}
+
+.k-step-mark {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  border-radius: 50%;
+  border: 1.5px solid var(--k-border-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  background: var(--k-bg);
+  z-index: 1;
+}
+
+.k-step--done {
+  color: var(--k-text-dim);
+}
+
+.k-step--done .k-step-mark {
+  background: var(--k-ok);
+  border-color: var(--k-ok);
+}
+
+.k-step--done .k-step-mark::after {
+  content: "✓";
+  color: #fff;
+  font-size: 9px;
+  line-height: 1;
+}
+
+/* the connector turns green once the step below it is reached */
+.k-step--done:not(:last-child)::after {
+  background: var(--k-ok);
+}
+
+.k-step--active {
+  color: var(--k-text);
+  font-weight: 600;
+}
+
+.k-step--active .k-step-mark {
+  border-color: var(--k-accent);
+  box-shadow: 0 0 0 3px rgba(74, 114, 245, 0.14);
+}
+
+.k-step--bad {
+  color: var(--k-bad);
+}
+
+.k-step--bad .k-step-mark {
+  background: var(--k-bad);
+  border-color: var(--k-bad);
+}
+
+.k-step--bad .k-step-mark::after {
+  content: "✕";
+  color: #fff;
+  font-size: 9px;
+  line-height: 1;
+}
+
+/* ── cards ───────────────────────────────────────────────────────────────── */
+
+.k-card {
+  border: 1px solid var(--k-border);
+  border-radius: 14px;
+  background: var(--k-bg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.k-card-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--k-text-faint);
+}
+
+.k-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.k-chip {
+  font-size: 11.5px;
+  padding: 3px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--k-border);
+  background: var(--k-side);
+  color: var(--k-text-dim);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.k-chip--mono { font-family: var(--k-mono); font-size: 11px; }
+
+.k-chip--type {
+  border-color: #f0dcc4;
+  background: #fdf6ec;
+  color: #9a6b28;
+  font-family: var(--k-mono);
+}
+
+.k-chip--ok {
+  border-color: #cfe9da;
+  background: var(--k-ok-bg);
+  color: var(--k-ok);
+}
+
+.k-chip--file {
+  border-color: #d9e2f8;
+  background: #f2f6fe;
+  color: #3a5bc7;
+  font-family: var(--k-mono);
+}
+
+.k-code {
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: var(--k-side);
+  border: 1px solid var(--k-border);
+  font-family: var(--k-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 130px;
+  overflow-y: auto;
+  color: var(--k-text-dim);
+}
+
+.k-code--error {
+  background: var(--k-bad-bg);
+  border-color: #f2d9d5;
+  color: #a13a2c;
+}
+
+.k-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.k-field-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--k-text-faint);
+}
+
+.k-field-body {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.68;
+  color: var(--k-text);
+  overflow-wrap: anywhere;
+}
+
+/* before / after */
+.k-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.k-diff-side {
+  border-radius: 10px;
+  border: 1px solid var(--k-border);
+  padding: 10px 12px;
+}
+
+.k-diff-side pre {
+  margin: 0;
+  font-family: var(--k-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.k-diff-side--before {
+  background: var(--k-bad-bg);
+  border-color: #f2d9d5;
+}
+
+.k-diff-side--before pre { color: #a13a2c; }
+
+.k-diff-side--after {
+  background: var(--k-ok-bg);
+  border-color: #cfe9da;
+}
+
+.k-diff-side--after pre { color: #17724a; }
+
+.k-diff-tag {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--k-text-faint);
+  margin-bottom: 5px;
+}
+
+.k-verified {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-top: 1px solid var(--k-border);
+  padding-top: 13px;
+}
+
+.k-verified code {
+  font-family: var(--k-mono);
+  font-size: 11.5px;
+  color: var(--k-ok);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 110px;
+  overflow-y: auto;
+}
+
+/* ── project memory ──────────────────────────────────────────────────────── */
+
+.k-mem {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.k-mem-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 11px;
+  border-left: 2px solid var(--k-border-strong);
+}
+
+.k-mem-type {
+  font-family: var(--k-mono);
+  font-size: 10.5px;
+  color: var(--k-warn);
+}
+
+.k-mem-text {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--k-text-dim);
+  overflow-wrap: anywhere;
+}
+
+.k-mem--notes .k-mem-row {
+  border-left-color: #d9e2f8;
+}
+
+/* ── file preview (middle column) ────────────────────────────────────────── */
+
+.k-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.k-viewer-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--k-border);
+}
+
+.k-viewer-path {
+  font-family: var(--k-mono);
+  font-size: 12px;
+  color: var(--k-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.k-viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.k-viewer-tag {
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--k-text-faint);
+  border: 1px solid var(--k-border);
+  border-radius: 5px;
+  padding: 2px 6px;
+}
+
+.k-viewer-close {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--k-border);
+  border-radius: 6px;
+  background: var(--k-bg);
+  color: var(--k-text-dim);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.k-viewer-close:hover {
+  background: var(--k-hover);
+  color: var(--k-text);
+}
+
+.k-viewer-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.k-viewer-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--k-text-faint);
+  font-size: 13px;
+}
+
+/* ── side navigation links (chat rail) ───────────────────────────────────── */
+
+.k-nav {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  color: var(--k-text-dim);
+  text-decoration: none;
+  font-size: 12.5px;
+  transition: background 0.12s, color 0.12s;
+}
+
+.k-nav:hover {
+  background: var(--k-hover);
+  color: var(--k-text);
+}
+
+.k-nav-mark {
+  width: 20px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--k-text-faint);
+}
+
+/* ── chat shell ──────────────────────────────────────────────────────────── */
+
+.k-chat {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.k-chat-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.k-chat-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.k-chat-inner {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+/* empty state fills the scroll area so the hero sits mid-pane */
+.k-chat-inner:has(.k-hero) {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.k-chat-inner .k-hero {
+  padding: 0;
+  max-width: 480px;
+  text-align: center;
+  align-items: center;
+}
+
+.k-chat-inner .k-hero-title {
+  font-size: 26px;
+  justify-content: center;
+}
+
+.k-chat-inner .k-hero-sub {
+  font-size: 13.5px;
+}
+
+/* ── messages ────────────────────────────────────────────────────────────── */
+
+.k-msg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 40px 0 24px;
+  min-height: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Zen on the left, you on the right — the familiar chat convention. */
+.k-msg-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+}
+
+.k-msg-row--assistant {
+  justify-content: flex-start;
+}
+
+.k-msg-row--user {
+  justify-content: flex-end;
+}
+
+.k-avatar {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--k-text);
+  color: var(--k-bg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 2px;
+  user-select: none;
+}
+
+.k-msg {
+  max-width: 78%;
+  min-width: 0;
+}
+
+.k-msg--user {
+  background: var(--k-active);
+  border: 1px solid var(--k-border);
+  border-radius: 14px 14px 4px 14px;
+  padding: 10px 14px;
+}
+
+/* Zen's replies are long-form, so they read as text rather than a bubble. */
+.k-msg--assistant {
+  padding: 2px 0 0;
+}
+
+.k-msg-body {
+  font-size: 14px;
+  line-height: 1.72;
+  color: var(--k-text);
+  overflow-wrap: anywhere;
+}
+
+.k-msg-body p {
+  margin: 0 0 10px;
+}
+
+.k-msg-body p:last-child {
+  margin-bottom: 0;
+}
+
+.k-msg-body ul,
+.k-msg-body ol {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+
+.k-msg-body li {
+  margin-bottom: 4px;
+}
+
+.k-msg-body pre {
+  margin: 10px 0;
+  padding: 11px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--k-border);
+  background: var(--k-side);
+  overflow-x: auto;
+}
+
+.k-msg-body code {
+  font-family: var(--k-mono);
+  font-size: 12px;
+}
+
+.k-msg-body :not(pre) > code {
+  background: var(--k-side);
+  border: 1px solid var(--k-border);
+  border-radius: 5px;
+  padding: 1px 5px;
+  font-size: 12px;
+}
+
+.k-msg-body h1,
+.k-msg-body h2,
+.k-msg-body h3 {
+  margin: 14px 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.k-msg-body a {
+  color: var(--k-accent);
+}
+
+.k-msg-body blockquote {
+  margin: 10px 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--k-border-strong);
+  color: var(--k-text-dim);
+}
+
+.k-msg--user .k-msg-body p {
+  margin: 0;
+}
+
+.k-typing {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  height: 22px;
+}
+
+.k-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--k-border-strong);
+  animation: k-blink 1.2s infinite ease-in-out;
+}
+
+.k-typing span:nth-child(2) { animation-delay: 0.15s; }
+.k-typing span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes k-blink {
+  0%, 80%, 100% { opacity: 0.3; }
+  40% { opacity: 1; }
+}
+
+/* ── composer ────────────────────────────────────────────────────────────── */
+
+.k-composer-wrap {
+  flex: 0 0 auto;
+  padding: 12px 32px 20px;
+}
+
+.k-composer-inner {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.k-composer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 9px 9px 16px;
+  border: 1px solid var(--k-border-strong);
+  border-radius: 16px;
+  background: var(--k-bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.k-composer:focus-within {
+  border-color: var(--k-accent);
+  box-shadow: 0 0 0 3px rgba(74, 114, 245, 0.12);
+}
+
+.k-composer input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--k-text);
+  font-family: var(--k-sans);
+  font-size: 14px;
+  padding: 6px 0;
+}
+
+.k-composer input::placeholder {
+  color: var(--k-text-faint);
+}
+
+.k-composer button {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: var(--k-text);
+  color: var(--k-bg);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+
+.k-composer button:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.k-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.k-quick button {
+  border: 1px solid var(--k-border);
+  background: var(--k-bg);
+  color: var(--k-text-dim);
+  border-radius: 999px;
+  padding: 5px 13px;
+  font-family: var(--k-sans);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.k-quick button:hover {
+  background: var(--k-hover);
+  color: var(--k-text);
+  border-color: var(--k-border-strong);
+}
+
+.k-composer-note {
+  margin: 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--k-text-faint);
+}
+
+/* ── memory bank drawer, restyled to match ───────────────────────────────── */
+
+.zen-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 20, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s;
+  z-index: 40;
+}
+
+.zen-sidebar-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.zen-memory-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: min(320px, 88vw);
+  height: 100vh;
+  min-height: 0;
+  background: var(--k-side);
+  border-right: 1px solid var(--k-border);
+  color: var(--k-text);
+  font-family: var(--k-sans);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform 0.2s ease;
+  z-index: 50;
+}
+
+.zen-memory-sidebar.open {
+  transform: translateX(0);
+}
+
+.zen-memory-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 1px solid var(--k-border);
+}
+
+.zen-memory-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.zen-memory-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.zen-memory-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.zen-memory-empty {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--k-text-faint);
+}
+
+.zen-memory-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 11px;
+  border-left: 2px solid var(--k-border-strong);
+}
+
+.zen-memory-item p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--k-text-dim);
+  overflow-wrap: anywhere;
+}
+
+.zen-memory-kind {
+  font-family: var(--k-mono);
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--k-warn);
+}
+
+.zen-memory-kind.lesson {
+  color: var(--k-accent);
+}
+
+.zen-memory-footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--k-border);
+}
+
+.zen-user-avatar {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 50%;
+  background: var(--k-active);
+  color: var(--k-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.zen-user-meta {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.zen-user-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zen-user-email {
+  font-size: 11px;
+  color: var(--k-text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zen-memory-sidebar .zen-icon-btn {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--k-border-strong);
+  border-radius: 7px;
+  background: var(--k-bg);
+  color: var(--k-text-dim);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.zen-memory-sidebar .zen-icon-btn:hover {
+  background: var(--k-hover);
+  color: var(--k-text);
+}
+
+.zen-memory-sidebar .zen-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── memory graph ────────────────────────────────────────────────────────── */
+
+.k-side-foot {
+  flex: 0 0 auto;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--k-border);
+}
+
+.k-graph-filter {
+  margin-top: 10px;
+}
+
+.k-chip--btn {
+  font-family: var(--k-sans);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.k-chip--btn:hover {
+  background: var(--k-hover);
+  color: var(--k-text);
+}
+
+.k-chip--btn.is-on {
+  background: var(--k-text);
+  border-color: var(--k-text);
+  color: var(--k-bg);
+}
+
+.k-dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.k-dot--fact {
+  background: var(--k-accent);
+}
+
+.k-dot--lesson {
+  background: var(--k-warn);
+}
+
+/* The memory list reuses the file list, but memory text is prose, not a path. */
+.k-side-files .k-file-name {
+  font-family: var(--k-sans);
+  font-size: 12.5px;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.45;
+}
+
+.k-side-files .k-file {
+  align-items: flex-start;
+}
+
+.k-side-files .k-dot {
+  margin-top: 5px;
+}
+
+.k-graph-pane {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.k-graph-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+.k-node {
+  cursor: grab;
+}
+
+.k-node:active {
+  cursor: grabbing;
+}
+
+.k-node circle {
+  stroke: var(--k-bg);
+  stroke-width: 2;
+  transition: opacity 0.15s;
+}
+
+.k-node--fact circle {
+  fill: var(--k-accent);
+}
+
+.k-node--lesson circle {
+  fill: var(--k-warn);
+}
+
+.k-node text {
+  fill: #fff;
+  font-family: var(--k-mono);
+  font-size: 9px;
+  text-anchor: middle;
+  pointer-events: none;
+  user-select: none;
+}
+
+.k-node:hover circle {
+  stroke: var(--k-text);
+}
+
+.k-node.is-selected circle {
+  stroke: var(--k-text);
+  stroke-width: 3;
+}
+
+.k-node.is-dim {
+  opacity: 0.28;
+}
+
+.k-edge {
+  stroke: var(--k-border-strong);
+  stroke-width: 1.4;
+}
+
+.k-edge--sim {
+  stroke: var(--k-accent);
+  stroke-dasharray: 4 4;
+  opacity: 0.55;
+}
+
+.k-edge.is-dim {
+  opacity: 0.2;
+}
+
+.k-graph-tip {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  max-width: min(680px, 86%);
+  padding: 8px 14px;
+  border: 1px solid var(--k-border);
+  border-radius: 10px;
+  background: var(--k-bg);
+  color: var(--k-text-dim);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  pointer-events: none;
+}
+
+.k-graph-hint {
+  color: var(--k-text-faint);
+  font-size: 13px;
+}
+
+.k-graph-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  max-width: 380px;
+}
+
+.k-graph-empty h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.k-graph-empty p {
+  margin: 0 0 6px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--k-text-dim);
+}
+
+.k-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: var(--k-text);
+  color: var(--k-bg);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.k-btn:hover {
+  opacity: 0.88;
+}
+
+/* ── responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 1240px) {
+  .k-main {
+    flex-basis: 350px;
+    width: 350px;
+  }
+}
+
+@media (max-width: 1020px) {
+  /* too tight for three columns: drop the rail, keep code + agent */
+  .k-side {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  /* one column: the code, with the agent rail beneath it */
+  .k-content {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .k-viewer-pane {
+    flex: 1 1 auto;
+    min-height: 46vh;
+  }
+  .k-main {
+    flex: 0 0 auto;
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--k-border);
+    overflow-y: visible;
+  }
+  .k-main-inner {
+    padding: 20px 16px 32px;
+  }
+  .k-chat-inner,
+  .k-composer-inner {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .k-composer-wrap {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

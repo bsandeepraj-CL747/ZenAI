@@ -77,6 +77,16 @@ async def chat(
             "finish_reason": choice.finish_reason,
         }
 
+        # gpt-oss models put their chain of thought in a separate field and
+        # leave `content` empty when they call tools. Without this the agent
+        # records an empty diagnosis for every successful fix.
+        reasoning = (
+            getattr(message, "reasoning", None)
+            or getattr(message, "reasoning_content", None)
+        )
+        if reasoning:
+            result["reasoning"] = reasoning
+
         if message.tool_calls:
             for tc in message.tool_calls:
                 try:
@@ -125,7 +135,11 @@ get_groq_client = get_client
 async def chat_completion(client, messages, tools=None, temperature=0.2, max_tokens=2000):
     res = await chat(messages, tools=tools, temperature=temperature, max_tokens=max_tokens)
     return {
-        "message": {"content": res["content"], "tool_calls": res["tool_calls"]},
+        "message": {
+            "content": res["content"],
+            "tool_calls": res["tool_calls"],
+            "reasoning": res.get("reasoning", ""),
+        },
         "error": res.get("error"),
     }
 
